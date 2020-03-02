@@ -1,0 +1,104 @@
+#!/bin/sh
+
+##
+# HubSpot API companies download
+#
+# Syntax:
+#
+#     hubspot-api-companies-download
+#
+# This tool is for [HubSpot](https://hubspot.com) account users.
+# This tool connects to the HubSpot API and downloads companies.
+#
+# The output is a series of JSON files with file names that
+# show the "visitor identification" (vid) after number and
+# the requested record count limit.
+#
+# Example output file names:
+#
+#     companies-after-0-limit-100.json
+#     companies-after-3051-limit-100.json
+#     companies-after-4753-limit-100.json
+#
+# This tool also combines the files' companies into one file name:
+#
+#     companies.json
+#
+# Author: joel@joelparkerhenderson.com
+##
+
+##
+#
+# sixarm-unix-shell-functions library
+#
+##
+
+# out: print output message to stdout
+out() { printf %s\\n "$*" ; }
+
+# err: print error message to stderr
+err() { >&2 printf %s\\n "$*" ; }
+
+# die: print error message to stderr, then exit with error code 1
+die() { >&2 printf %s\\n "$*" ; exit 1 ; }
+
+# cmd: return true iff a command exists
+cmd() { command -v "$1" >/dev/null 2>&1 ; }
+
+##
+#
+# HubSpot API
+#
+##
+
+# Get HubSpot API URI to download
+# Syntax: uri $after $limit 
+uri() {
+    out "https://api.hubapi.com/crm/v3/objects/companies?hapikey=$HUBSPOT_API_KEY&after=$1&limit=$2"
+}
+
+# Get name to save the data file
+# Syntax: file_name $after $limit
+file_name() {
+    out "companies-after-$1-limit-$2.json"   
+}
+
+# Get the file's HubSpot cursor identifier
+# Syntax: file_paging_next_after $file_name
+file_paging_next_after() {
+    jq '.paging.next.after' "$1"
+}
+
+# Combine all the response companies files into one big file
+# Syntax: file_join
+file_join() {
+    jq -s 'reduce .[].companies as $item ([]; . + $item)' companies-after-*-limit-*.json > companies.json
+}
+
+# Verify preflight
+# Syntax: preflight
+preflight() {
+    [ -z ${HUBSPOT_API_KEY+x} ] && die "Environment needed: HUBSPOT_API_KEY"
+    cmd curl || die "Command needed: curl (HTTP downloader)"
+    cmd jq || die "Command needed: jq (JSON processor)"
+}
+
+# Main function
+# Syntax: main
+main() {
+    after=0
+    limit=100
+    while true; do
+        file_name=$(file_name $after $limit)
+        test -e "$file_name" || curl -s $(uri $after $limit) > "$file_name"
+        after=$(file_paging_next_after "$file_name")
+        if [ "$after" = "null" ]; then
+            break
+        fi
+    done
+    file_join
+}
+
+preflight
+main
+exit 0
