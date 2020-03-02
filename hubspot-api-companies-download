@@ -74,7 +74,7 @@ file_paging_next_after() {
 # Combine all the response companies files into one big file
 # Syntax: file_join
 file_join() {
-    jq -s 'reduce .[].companies as $item ([]; . + $item)' companies-after-*-limit-*.json > companies.json
+    jq -s 'reduce .[].results as $item ([]; . + $item)' companies-after-*-limit-*.json > companies.json
 }
 
 # Verify preflight
