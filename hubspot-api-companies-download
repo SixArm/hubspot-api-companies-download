@@ -54,7 +54,9 @@ cmd() { command -v "$1" >/dev/null 2>&1 ; }
 # Get HubSpot API URI to download
 # Syntax: uri $after $limit 
 uri() {
-    out "https://api.hubapi.com/crm/v3/objects/companies?hapikey=$HUBSPOT_API_KEY&after=$1&limit=$2"
+    after="$1"
+    limit="$2"
+    echo "https://api.hubapi.com/crm/v3/objects/companies?hapikey=$HUBSPOT_API_KEY&"$([ "$after" = "0" ] && echo "" || echo "after=$after&")"limit=$limit"
 }
 
 # Get name to save the data file
@@ -66,7 +68,7 @@ file_name() {
 # Get the file's HubSpot cursor identifier
 # Syntax: file_paging_next_after $file_name
 file_paging_next_after() {
-    jq '.paging.next.after' "$1"
+    jq -r '.paging.next.after' "$1"
 }
 
 # Combine all the response companies files into one big file
@@ -90,7 +92,8 @@ main() {
     limit=100
     while true; do
         file_name=$(file_name $after $limit)
-        test -e "$file_name" || curl -s $(uri $after $limit) > "$file_name"
+        uri=$(uri $after $limit)
+        test -e "$file_name" || curl -s "$uri" > "$file_name"
         after=$(file_paging_next_after "$file_name")
         if [ "$after" = "null" ]; then
             break
